@@ -30,7 +30,7 @@ def css():
     }
     </style>"""
 
-# create a map tile based on the visitor's gps coordinates
+# create a map tile based on the visitor's gps coordinates. remember to set the lambda environment value 'tomtomkey' with a valid api key
 def plot_gps(x):
     k   = os.environ['tomtomkey']
     u   = 'https://api.tomtom.com/map/1/staticimage?center='+str(x)+'&zoom=12&format=jpg&layer=basic&style=main&width=1280&height=250&view=Unified&key='+k
@@ -44,7 +44,6 @@ def plot_gps(x):
         r   = requests.get(u, stream = True)
         b   = 'file not found, downloaded'
 
-        #if r.status_code == 200:
         with open(g, 'wb') as f:
             r.raw.decode_content = True
             shutil.copyfileobj(r.raw, f) 
