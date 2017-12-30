@@ -43,7 +43,7 @@ def get_posts():
 def write_dynamo(ip, co, ua):
     d   = get_dynamo_sess().Table(os.environ['dynamo_user_table'])
     d.put_item(Item = {
-        'unixts' : datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+        'date' : datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
         'timest' : str(int(time.time())),
         'ip' : ip,
         'usera' : ua,
