@@ -36,7 +36,7 @@ def get_posts():
 
     y   = ''
     for x in sorted(h, reverse = True):
-        y += '<b><a href='+x[2]+'>'+x[1]+'</a></b> - <i>posted '+get_date(x[0])+' ago</i><br><br>'+x[3]+'<br><br><br>'
+        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b> - <i>posted '+get_date(x[0])+' ago</i><br><br>'+x[3]+'<br><br><br>'
 
     return y
 
