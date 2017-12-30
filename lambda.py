@@ -33,38 +33,14 @@ def get_dynamo():
 
     y   = ''
     for x in sorted(h, reverse = True):
-        y += '<b><a href='+x[2]+'>'+x[1]+'</a></b><br><i>posted '+get_date(x[0])+' ago</i><br><br>'+x[3]+'<br><br>'
+        y += '<b><a href='+x[2]+'>'+x[1]+'</a></b> - <i>posted '+get_date(x[0])+' ago</i><br><br>'+x[3]+'<br><br><br>'
 
     return y
-    
-# return a static blob of css
-def css():
-    return """<style type="text/css">
-    a:link {
-        color: red;
-    }
-    
-    a:visited {
-        color: black;
-    }
-    
-    body {
-        height: 50%;
-        background: #fff;
-        margin-top: 50px;
-        margin-bottom: 50px;
-        padding: 0;
-        font-family: Courier New, Fixed;
-        font-size: 15px;
-        color: #555;
-    }
-    </style>"""
 
 # parse the html file including the image
 def parse_html():
-    h = '<html><head><title>Marek Kuczy&#324;ski</title>'+css()+'</head>'
+    h = '<html><head><title>Marek Kuczy&#324;ski</title><link rel="stylesheet" type="text/css" href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/main.css"></script></head>'
     h += '<body><center><h1><center>Marek Kuczy&#324;ski</h1>'
-    h += '<a href="https://github.com/marekq/marek.rocks"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/38ef81f8aca64bb9a64448d0d70f1308ef5341ab/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png"></a>'
     h += get_image()+'<br><br>'
     h += '<a target="_blank" href="https://github.com/marekq">github</a> | '
     h += '<a target="_blank" href="http://nl.linkedin.com/in/marekkuczynski">linkedin</a> | '
