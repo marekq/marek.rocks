@@ -4,6 +4,7 @@
 # www.marek.rocks
 
 import botocore.vendored.requests as requests, boto3, datetime, os, random, time
+from boto3.dynamodb.conditions import Key, Attr
 
 # get a random image back
 def get_image():
@@ -27,34 +28,53 @@ def get_date(x):
         return str(int(z)/3600)+' hours'
     
 # get all the blog posts from dynamodb    
-def get_posts(d):
-    h   = []
+def get_posts(d, npa):
     d   = d.Table(os.environ['dynamo_post_table'])
-    for x in d.scan()['Items']:
-        if x.has_key('desc'):
-            h.append([x['timest'], x['title'], x['link'], x['desc']])
-        else:
-            h.append([x['timest'], x['title'], x['link'], 'no description found'])
-
     y   = ''
+    h   = []
+
+    if npa == 'all':
+        for x in d.scan()['Items']:
+            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source']])
+            
+    else:
+        for x in d.query(KeyConditionExpression=Key('source').eq(npa))['Items']:
+            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source']])
+
     for x in sorted(h, reverse = True):
-        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b> - <i>posted '+get_date(x[0])+' ago</i><br><br>'+x[3]+'<br><br><br>'
+        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+get_date(x[0])+' ago in '+x[4]+'</i><br><br>'+x[3]+'<br><br><br>'
 
     return y
 
 # write details about the web visitor to dynamodb
-def write_dynamo(d, ip, co, ua):
+def write_dynamo(d, ip, co, ua, pa, npa):
     d   = d.Table(os.environ['dynamo_user_table'])
     d.put_item(Item = {
         'date' : datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
-        'timest' : str(int(time.time())),
-        'ip' : ip,
-        'usera' : ua,
-        'country' : co
-    })
-    
+		'timest' : str(int(time.time())),
+		'ip' : ip,
+		'usera' : ua,
+		'country' : co,
+		'user-path' : pa,
+		'new-path' : npa
+	})
+
+# debug headers
+def parse_debug(event):
+    h = str(event)
+    return h
+
+# rewrite the url path if needed
+def check_path(x):
+    if x.lower() == '/whatsnew':
+        return 'whats-new'
+    elif x.lower() == '/newsblog':
+        return 'newsblog'
+    else:
+        return 'all'
+
 # parse the html file including the image
-def parse_html(d):
+def parse_html(d, npa):
     h = '<html><head><title>Marek Kuczy&#324;ski</title><link rel="stylesheet" type="text/css" href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/main.css"></script></head>'
     h += '<body><center><h1><center>Marek Kuczy&#324;ski</h1>'
     h += get_image()+'<br><br>'
@@ -62,19 +82,23 @@ def parse_html(d):
     h += '<a target="_blank" href="http://nl.linkedin.com/in/marekkuczynski">linkedin</a> | '
     h += '<a href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/papers.html">university papers</a> | '
     h += '<a target="_blank" href="http://twitter.com/marekq">twitter</a><br><br>'
-    h += '<h3>AWS blog feeds</h3><table width="800px"><tr><td>'
-    h += get_posts(d)
+    h += '<h3>AWS blog feeds - '+npa+'</h3><table width="800px"><tr><td>'
+    h += get_posts(d, npa)
     h += '</td></tr></table></center></body></html>'
     return h
 
 # return an html document when the lambda function is triggered
 def handler(event, context):
-    d  = get_dynamo_sess()
-    ip = str(event['headers']['X-Forwarded-For']).split(',')[0]
-    co = str(event['headers']['CloudFront-Viewer-Country'])
-    ua = str(event['headers']['User-Agent'])
-    write_dynamo(d, ip, co, ua)
+    d   = get_dynamo_sess()
+    ip  = str(event['headers']['X-Forwarded-For']).split(',')[0]
+    co  = str(event['headers']['CloudFront-Viewer-Country'])
+    ua  = str(event['headers']['User-Agent'])
+
+    pa  = event['path']
+    npa = check_path(pa)
+    
+    write_dynamo(d, ip, co, ua, pa, npa)
 
     return {'statusCode': 200,
-            'body': parse_html(d),
+            'body': parse_html(d, npa),
             'headers': {'Content-Type': 'text/html'}}
