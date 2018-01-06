@@ -59,16 +59,25 @@ def write_dynamo(d, ip, co, ua, pa, npa):
 		'new-path' : npa
 	})
 
-# debug headers
+# generate highlighted url for aws blog links
+def generate_urls(npa):
+    h   = 'AWS blog feeds ( '
+
+    for x in ['all', 'whats-new', 'newsblog']:
+        h += '<a href="https://marek.rocks/'+x+'">'+x+'</a> '
+            
+    return h+' )<br><br>'
+
+# print http headers for debug headers
 def parse_debug(event):
     h = str(event)
     return h
 
 # rewrite the url path if needed
 def check_path(x):
-    if x.lower() == '/whatsnew':
+    if x.strip('/') == 'whats-new':
         return 'whats-new'
-    elif x.lower() == '/newsblog':
+    elif x.strip('/') == 'newsblog':
         return 'newsblog'
     else:
         return 'all'
@@ -81,9 +90,9 @@ def parse_html(d, npa):
     h += '<a target="_blank" href="https://github.com/marekq">github</a> | '
     h += '<a target="_blank" href="http://nl.linkedin.com/in/marekkuczynski">linkedin</a> | '
     h += '<a href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/papers.html">university papers</a> | '
-    h += '<a target="_blank" href="http://twitter.com/marekq">twitter</a><br><br>'
-    h += '<h3>AWS blog feeds - '+npa+'</h3><table width="800px"><tr><td>'
-    h += get_posts(d, npa)
+    h += '<a target="_blank" href="http://twitter.com/marekq">twitter</a><br><br>- - -<br><br>'
+    h += generate_urls(npa)
+    h += '<table width="800px"><tr><td>'+get_posts(d, npa)
     h += '</td></tr></table></center></body></html>'
     return h
 
@@ -96,7 +105,7 @@ def handler(event, context):
 
     pa  = event['path']
     npa = check_path(pa)
-    
+
     write_dynamo(d, ip, co, ua, pa, npa)
 
     return {'statusCode': 200,
