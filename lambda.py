@@ -17,8 +17,6 @@ def get_image():
 def get_dynamo_sess(): 
     d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region'])
     return d
-
-
         
 # determine how old the aws blog post is  
 def get_date(x):
@@ -74,14 +72,6 @@ def write_dynamo(d, ip, co, ua, pa, npa):
 # generate highlighted url for aws blog links
 def generate_urls(d, npa):
     h   = '<center>'
-
-    ''' # This code currently generates too much requests to dynamodb per pageload, need to figure out something smarter
-    d   = d.Table(os.environ['dynamo_post_table'])
-    for x in blogs:
-        if x == 'all':
-            c   = d.item_count
-        else:
-            c   = d.query(KeyConditionExpression=Key('source').eq(x), Select='COUNT')['Count']'''
     
     if x == npa:
         h += '<a href="https://marek.rocks/'+x+'"><font color = "red">'+x+'</font></a> &#8226; '
