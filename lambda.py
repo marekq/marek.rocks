@@ -27,8 +27,12 @@ def get_date(x):
         return str(int(z)/86400)+' days'
     elif z > 86400:
         return str(int(z)/86400)+' day'
-    else:
+    elif z > 7200:
         return str(int(z)/3600)+' hours'
+    elif z > 3600:
+        return str(int(z)/3600)+' hour'
+    else:
+        return str(int(z)/60)+' minutes'
     
 # get all the blog posts from dynamodb    
 def get_posts(d, npa):
@@ -39,11 +43,11 @@ def get_posts(d, npa):
     # check if a url path was specified and return all articles. if no path was selected, return all articles
     if npa == 'all':
         for x in d.scan()['Items']:
-            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source']])
+            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
             
     else:
         for x in d.query(KeyConditionExpression=Key('source').eq(npa))['Items']:
-            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source']])
+            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -51,8 +55,10 @@ def get_posts(d, npa):
             desc    = x[3][:500]+' ...'
         else:
             desc    = x[3]
-            
-        y += '<center><b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+get_date(x[0])+' ago in '+x[4]+'</i></center><br>'+desc+'<br><br><br>'
+        
+        t           = get_date(x[0])    
+        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br>'
+        print '@', x[1], t
 
     return y
 
@@ -73,11 +79,12 @@ def write_dynamo(d, ip, co, ua, pa, npa):
 def generate_urls(d, npa):
     h   = '<center>'
     
-    if x == npa:
-        h += '<a href="https://marek.rocks/'+x+'"><font color = "red">'+x+'</font></a> &#8226; '
-
-    else:
-        h += '<a href="https://marek.rocks/'+str(x)+'">'+x+'</a> &#8226; '
+    for x in blogs:
+        if x == npa:
+            h += '<a href="https://marek.rocks/'+x+'"><font color = "red">'+x+'</font></a> &#8226; '
+    
+        else:
+            h += '<a href="https://marek.rocks/'+str(x)+'">'+x+'</a> &#8226; '
             
     return h[:-8]+'</center><br><br>'
 
@@ -97,9 +104,9 @@ def check_path(x):
 
 # parse the html file including the image
 def parse_html(d, npa):
-    h =  '<html><head><title>Marek Kuczy&#324;ski</title>'
+    h =  '<html><head><title>AWS RSS blog feed</title>'
     h += '<link rel="stylesheet" type="text/css" href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/main.css"></script></head>'
-    h += '<body><center><center><h1>Marek Kuczy&#324;ski - AWS blog</h1></center>'
+    h += '<body><center><center><h1>Marek\'s AWS blog feed</h1><a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a><br><br></center>'
     h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
     h += get_posts(d, npa)
     h += '</td></tr></table></body></html>'
