@@ -33,7 +33,7 @@ def get_date(x):
         return str(int(z)/3600)+' hour'
     else:
         return str(int(z)/60)+' minutes'
-    
+
 # get all the blog posts from dynamodb    
 def get_posts(d, npa):
     d   = d.Table(os.environ['dynamo_post_table'])
@@ -42,12 +42,21 @@ def get_posts(d, npa):
 
     # check if a url path was specified and return all articles. if no path was selected, return all articles
     if npa == 'all':
-        for x in d.scan()['Items']:
+        e   = d.scan()
+        c   = e['Count']
+        
+        for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
             
     else:
-        for x in d.query(KeyConditionExpression=Key('source').eq(npa))['Items']:
+        e   = d.query(KeyConditionExpression=Key('source').eq(npa))
+        c   = e['Count']
+
+        for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
+
+    print '@ count @ ', c, npa
+    z       = '<center>'+str(c)+' articles found for '+npa+'<br><a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></center><br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -58,9 +67,9 @@ def get_posts(d, npa):
         
         t           = get_date(x[0])    
         y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br>'
-        print '@', x[1], t
+        print '$', x[1], t
 
-    return y
+    return z+y
 
 # write details about the web visitor to dynamodb
 def write_dynamo(d, ip, co, ua, pa, npa):
@@ -90,8 +99,8 @@ def generate_urls(d, npa):
 
 # print http headers for debug headers
 def parse_debug(event):
-    h = str(event)
-    return h
+    h   = str(event)
+    print '%', h
 
 # rewrite the url path if needed. if no path was specified, return all articles
 def check_path(x):
@@ -106,7 +115,7 @@ def check_path(x):
 def parse_html(d, npa):
     h =  '<html><head><title>AWS RSS blog feed</title>'
     h += '<link rel="stylesheet" type="text/css" href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/main.css"></script></head>'
-    h += '<body><center><center><h1>Marek\'s AWS blog feed</h1><a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a><br><br></center>'
+    h += '<body><center><center><h1>Marek\'s AWS blog feed</h1></center>'
     h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
     h += get_posts(d, npa)
     h += '</td></tr></table></body></html>'
@@ -121,6 +130,7 @@ def handler(event, context):
 
     pa  = event['path']
     npa = check_path(pa)
+    parse_debug(event)
 
     # write a log entry to dynamodb
     write_dynamo(d, ip, co, ua, pa, npa)
