@@ -14,11 +14,13 @@ The webpage uses the following serverless components whenever a visitor opens it
 Installation
 ------------
 
-Configure the environment variables of the Lambda function as follows;
+Create a Python 3.6 function with Lambda and configure the environment variables of the Lambda function as follows;
 
 
 ![alt tag](https://raw.githubusercontent.com/marekq/marek.rocks/master/docs/2.png)
 
+
+In addition, run 'pip install aws-xray-sdk -t .' in the local directory in order to install the X-Ray Python dependancies. 
 
 
 Contact

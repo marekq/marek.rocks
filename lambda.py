@@ -1,10 +1,13 @@
-#!/usr/bin/python
 # marek kuczynski
 # @marekq
 # www.marek.rocks
 
 import botocore.vendored.requests as requests, boto3, datetime, os, random, time
 from boto3.dynamodb.conditions import Key, Attr
+
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch
+patch(('boto3', 'requests'))
 
 # defines all blog categories from dynamodb which will be included on the page
 blogs = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins']
@@ -24,15 +27,15 @@ def get_date(x):
     z = int(y) - int(x)
     
     if z > 172800:
-        return str(int(z)/86400)+' days'
+        return str(int(int(z)/86400))+' days'
     elif z > 86400:
-        return str(int(z)/86400)+' day'
+        return str(int(int(z)/86400))+' day'
     elif z > 7200:
-        return str(int(z)/3600)+' hours'
+        return str(int(int(z)/3600))+' hours'
     elif z > 3600:
-        return str(int(z)/3600)+' hour'
+        return str(int(int(z)/3600))+' hour'
     else:
-        return str(int(z)/60)+' minutes'
+        return str(int(int(z)/60))+' minutes'
 
 # get all the blog posts from dynamodb    
 def get_posts(d, npa):
@@ -42,21 +45,22 @@ def get_posts(d, npa):
 
     # check if a url path was specified and return all articles. if no path was selected, return all articles
     if npa == 'all':
-        e   = d.scan()
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES')
         c   = e['Count']
-        
+        s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
+
         for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
             
     else:
-        e   = d.query(KeyConditionExpression=Key('source').eq(npa))
+        e   = d.query(KeyConditionExpression=Key('source').eq(npa), ReturnConsumedCapacity = 'INDEXES')
         c   = e['Count']
+        s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
 
         for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
 
-    print '@ count @ ', c, npa
-    z       = '<center>'+str(c)+' articles found for '+npa+'<br><a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></center><br><br>'
+    z       = '<center>'+str(c)+' articles found for '+npa+' - '+s+' bytes<br><br>' #<a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></u></center><br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -67,7 +71,6 @@ def get_posts(d, npa):
         
         t           = get_date(x[0])    
         y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br>'
-        print '$', x[1], t
 
     return z+y
 
@@ -100,7 +103,7 @@ def generate_urls(d, npa):
 # print http headers for debug headers
 def parse_debug(event):
     h   = str(event)
-    print '%', h
+    print('%', h)
 
 # rewrite the url path if needed. if no path was specified, return all articles
 def check_path(x):
@@ -123,19 +126,32 @@ def parse_html(d, npa):
 
 # return an html document when the lambda function is triggered
 def handler(event, context):
-    d   = get_dynamo_sess()
-    ip  = str(event['headers']['X-Forwarded-For']).split(',')[0]
-    co  = str(event['headers']['CloudFront-Viewer-Country'])
-    ua  = str(event['headers']['User-Agent'])
+    # create a session with dynamodb and get requestor http headers
+    seg     = xray_recorder.begin_subsegment('dynamo-session')
+    d       = get_dynamo_sess()
+    ip      = str(event['headers']['X-Forwarded-For']).split(',')[0]
+    co      = str(event['headers']['CloudFront-Viewer-Country'])
+    ua      = str(event['headers']['User-Agent'])
+    xray_recorder.end_subsegment()
 
-    pa  = event['path']
-    npa = check_path(pa)
+    # clean the given url path and print debug
+    seg     = xray_recorder.begin_subsegment('path-find')
+    pa      = event['path']
+    npa     = check_path(pa)
     parse_debug(event)
+    xray_recorder.end_subsegment()
 
     # write a log entry to dynamodb
+    seg     = xray_recorder.begin_subsegment('dynamo-write')
     write_dynamo(d, ip, co, ua, pa, npa)
+    xray_recorder.end_subsegment()
+
+    # parse the html output for the client
+    seg     = xray_recorder.begin_subsegment('html-parse')
+    h       = parse_html(d, npa)
+    xray_recorder.end_subsegment()
 
     # return the html code to api gateway
     return {'statusCode': 200,
-            'body': parse_html(d, npa),
+            'body': h,
             'headers': {'Content-Type': 'text/html'}}
