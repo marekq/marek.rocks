@@ -1,21 +1,18 @@
+#!/usr/bin/python
 # marek kuczynski
 # @marekq
 # www.marek.rocks
 
-import botocore.vendored.requests as requests, boto3, datetime, os, random, time
+import boto3, datetime, os, random, time
 from boto3.dynamodb.conditions import Key, Attr
 
 from aws_xray_sdk.core import xray_recorder
-from aws_xray_sdk.core import patch
-patch(('boto3', 'requests'))
+from aws_xray_sdk.core import patch_all
+patch_all()
 
 # defines all blog categories from dynamodb which will be included on the page
 blogs = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins']
 
-# get a random image back
-def get_image():
-    return '<img src="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/images/'+str(random.randint(1,4))+'.jpg" width=100%>'
-  
 # open a session with the dynamodb service
 def get_dynamo_sess(): 
     d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region'])
@@ -60,7 +57,7 @@ def get_posts(d, npa):
         for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
 
-    z       = '<center>'+str(c)+' articles found for '+npa+' - '+s+' bytes<br><br>' #<a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></u></center><br><br>'
+    z       = '<center>'+str(c)+' articles found for '+npa+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>' #<a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></u></center><br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -73,19 +70,6 @@ def get_posts(d, npa):
         y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br>'
 
     return z+y
-
-# write details about the web visitor to dynamodb
-def write_dynamo(d, ip, co, ua, pa, npa):
-    d   = d.Table(os.environ['dynamo_user_table'])
-    d.put_item(Item = {
-        'date' : datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
-        'timest' : str(int(time.time())),
-        'ip' : ip,
-        'usera' : ua,
-        'country' : co,
-        'user-path' : pa,
-        'new-path' : npa
-    })
 
 # generate highlighted url for aws blog links
 def generate_urls(d, npa):
@@ -137,13 +121,12 @@ def handler(event, context):
     # clean the given url path and print debug
     seg     = xray_recorder.begin_subsegment('path-find')
     pa      = event['path']
+    seg.put_metadata('key', {ip}, 'IP')
+    seg.put_metadata('key', {pa}, 'path')
+    seg.put_metadata('key', {co}, 'country')
+    
     npa     = check_path(pa)
     parse_debug(event)
-    xray_recorder.end_subsegment()
-
-    # write a log entry to dynamodb
-    seg     = xray_recorder.begin_subsegment('dynamo-write')
-    write_dynamo(d, ip, co, ua, pa, npa)
     xray_recorder.end_subsegment()
 
     # parse the html output for the client
