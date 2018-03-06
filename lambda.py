@@ -3,7 +3,7 @@
 # @marekq
 # www.marek.rocks
 
-import boto3, datetime, os, random, time
+import boto3, datetime, os, time 
 from boto3.dynamodb.conditions import Key, Attr
 
 from aws_xray_sdk.core import xray_recorder
@@ -57,7 +57,7 @@ def get_posts(d, npa):
         for x in e['Items']:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author']])
 
-    z       = '<center>'+str(c)+' articles found for '+npa+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>' #<a href="https://github.com/marekq/marek.rocks">page live rendered through AWS Lambda</a></u></center><br><br>'
+    z       = '<center>'+str(c)+' articles found for '+npa+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -98,10 +98,17 @@ def check_path(x):
     else:
         return 'all'
 
+# load the css file
+def load_css():
+    f   = open('main.css', 'r')
+    x   = f.read()
+    f.close()
+    return x 
+	
 # parse the html file including the image
 def parse_html(d, npa):
     h =  '<html><head><title>AWS RSS blog feed</title>'
-    h += '<link rel="stylesheet" type="text/css" href="https://s3-'+os.environ['s3_region']+'.amazonaws.com/'+os.environ['s3_bucket']+'/main.css"></script></head>'
+    h += load_css()+'</head>'
     h += '<body><center><center><h1>Marek\'s AWS blog feed</h1></center>'
     h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
     h += get_posts(d, npa)

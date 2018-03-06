@@ -6,7 +6,12 @@
     a:visited {
         color: black;
     }
-    
+
+    u.dotted{
+  	border-bottom: 1px dashed #999;
+  	text-decoration: none; 
+    }
+
     img {
         max-width: 800px;
     }
