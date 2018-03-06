@@ -3,7 +3,7 @@
 # @marekq
 # www.marek.rocks
 
-import boto3, datetime, os, time 
+import boto3, datetime, os, time
 from boto3.dynamodb.conditions import Key, Attr
 
 from aws_xray_sdk.core import xray_recorder
@@ -18,6 +18,9 @@ def get_dynamo_sess():
     d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region'])
     return d
         
+# create a connection with DynamoDB 
+d   = get_dynamo_sess()
+
 # determine how old the aws blog post is  
 def get_date(x):
     y = time.time()
@@ -117,9 +120,8 @@ def parse_html(d, npa):
 
 # return an html document when the lambda function is triggered
 def handler(event, context):
-    # create a session with dynamodb and get requestor http headers
+    # get requestor http headers
     seg     = xray_recorder.begin_subsegment('dynamo-session')
-    d       = get_dynamo_sess()
     ip      = str(event['headers']['X-Forwarded-For']).split(',')[0]
     co      = str(event['headers']['CloudFront-Viewer-Country'])
     ua      = str(event['headers']['User-Agent'])
