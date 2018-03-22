@@ -15,7 +15,7 @@ blogs = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java
 
 # open a session with the dynamodb service
 def get_dynamo_sess(): 
-    d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region']).Table(os.environ['dynamo_post_table']
+    d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region']).Table(os.environ['dynamo_post_table'])
     return d
         
 # create a connection with DynamoDB 
@@ -44,16 +44,16 @@ def get_posts(d, npa, tag):
 
     # check if a url path was specified and return all articles. if no path was selected, return all articles
     if npa == 'all':
-        e   = d.scan(ReturnConsumedCapacity = 'INDEXES')
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Key('timest').gt(str(int(time.time()) - 2592000)))
 
     # if a tag is specified in the get path, scan for it in the tag value
     elif npa == 'tag':
         print('query '+tag.lower().replace('%20', ' '))
-        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression=Attr('lower-tag').contains(tag.lower().replace('%20', ' ')))
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Attr('lower-tag').contains(tag.lower().replace('%20', ' ')))
 
     # else resume the articles for the tag specified
     else:
-        e   = d.query(ReturnConsumedCapacity = 'INDEXES', KeyConditionExpression=Key('source').eq(npa))
+        e   = d.query(ReturnConsumedCapacity = 'INDEXES', KeyConditionExpression = Key('source').eq(npa))
     
     c   = e['Count']
     s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
@@ -64,7 +64,7 @@ def get_posts(d, npa, tag):
         else:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], ''])
 
-    z       = '<center>'+str(c)+' articles found for '+npa+' '+tag+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
+    z   = '<center>'+str(c)+' articles found for '+npa+' '+tag.replace('%20', ' ')+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -122,7 +122,7 @@ def load_css():
     x   = f.read()
     f.close()
     return x 
-	
+    
 # parse the html file including the image
 def parse_html(d, npa, tag):
     h =  '<html><head><title>AWS RSS blog feed</title>'
