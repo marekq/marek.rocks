@@ -42,9 +42,9 @@ def get_posts(d, npa, tag):
     y   = ''
     h   = []
 
-    # check if a url path was specified and return all articles. if no path was selected, return all articles
+    # check if a url path was specified and return all articles. if no path was selected, return all articles. return the last 30 days of blogposts only.
     if npa == 'all':
-        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Key('timest').gt(str(int(time.time()) - 2592000)))
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Key('timest').gt(str(int(time.time()) - int(2592000))))
 
     # if a tag is specified in the get path, scan for it in the tag value
     elif npa == 'tag':
@@ -64,7 +64,7 @@ def get_posts(d, npa, tag):
         else:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], ''])
 
-    z   = '<center>'+str(c)+' articles found for '+npa+' '+tag.replace('%20', ' ')+' - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
+    z   = '<center>'+str(c)+' articles found for '+npa+' <font color = "red">'+tag.replace('%20', ' ')+'</font> - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -74,16 +74,23 @@ def get_posts(d, npa, tag):
             desc    = x[3]
         
         t           = get_date(x[0])
-        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br><small><font color="#cccccc">tags - '+get_links(x[6])+'</font></small><br><br>'
+        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br><small><font color="#cccccc">tags - '+get_links(x[6], tag.replace('%20', ' '))+'</font></small><br><br>'
 
     return z+y
 
 # generate tag url links
-def get_links(tags):
+def get_links(tags, tag):
     h = ''
     for x in tags.split(','):
-        h += '<a href = "https://marek.rocks/tag/'+str(x).strip(' ').replace('%20', ' ')+'">'+str(x)+'</a> &#8226; '
-    return h
+        ct = str(x).strip(' ').replace('%20', ' ')
+        print('&&& '+ct)
+
+        if tag == ct:
+            h += '<a href = "https://marek.rocks/tag/'+ct+'"><font color = "red">'+ct+'</font></a> &#8226; '
+        else:
+            h += '<a href = "https://marek.rocks/tag/'+ct+'">'+ct+'</a> &#8226; '
+            
+    return h[:-8]
 
 # generate highlighted url for aws blog links
 def generate_urls(d, npa):
@@ -122,7 +129,7 @@ def load_css():
     x   = f.read()
     f.close()
     return x 
-    
+	
 # parse the html file including the image
 def parse_html(d, npa, tag):
     h =  '<html><head><title>AWS RSS blog feed</title>'
@@ -160,5 +167,5 @@ def handler(event, context):
 
     # return the html code to api gateway
     return {'statusCode': 200,
-            'body': h,
+            'body': str(h),
             'headers': {'Content-Type': 'text/html'}}
