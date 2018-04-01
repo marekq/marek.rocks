@@ -74,7 +74,7 @@ def get_posts(d, npa, tag):
             desc    = x[3]
         
         t           = get_date(x[0])
-        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br><small><font color="#cccccc">tags - '+get_links(x[6], tag.replace('%20', ' '))+'</font></small><br><br>'
+        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br><small><font color="#cccccc">tags - '+get_links(x[6], tag.replace('%20', ' '))+'</font></small><br><br><br>'
 
     return z+y
 
@@ -83,9 +83,8 @@ def get_links(tags, tag):
     h = ''
     for x in tags.split(','):
         ct = str(x).strip(' ').replace('%20', ' ')
-        print('&&& '+ct)
 
-        if tag == ct:
+        if tag.lower() == ct.lower():
             h += '<a href = "https://marek.rocks/tag/'+ct+'"><font color = "red">'+ct+'</font></a> &#8226; '
         else:
             h += '<a href = "https://marek.rocks/tag/'+ct+'">'+ct+'</a> &#8226; '
@@ -136,6 +135,7 @@ def parse_html(d, npa, tag):
     h += load_css()+'</head>'
     h += '<body><center><center><h1>Marek\'s AWS blog feed</h1></center>'
     h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
+    h += '<center><img src = "https://marek.rocks/1.png" width = 800px></center>'
     h += get_posts(d, npa, tag)
     h += '</td></tr></table></body></html>'
     return h
@@ -147,6 +147,8 @@ def handler(event, context):
     ip      = str(event['headers']['X-Forwarded-For']).split(',')[0]
     co      = str(event['headers']['CloudFront-Viewer-Country'])
     ua      = str(event['headers']['User-Agent'])
+    ho      = str(event['headers']['Host'])
+    print('HHH', ho)
     xray_recorder.end_subsegment()
 
     # clean the given url path and print debug
