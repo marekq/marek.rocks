@@ -7,7 +7,6 @@ import boto3, datetime, os, time
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core import patch_all
 from boto3.dynamodb.conditions import Key, Attr
-
 patch_all()
 
 # defines all blog categories from dynamodb which will be included on the page
@@ -18,7 +17,7 @@ def get_dynamo_sess():
     d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region']).Table(os.environ['dynamo_post_table'])
     return d
         
-# create a connection with DynamoDB 
+# create a connection with DynamoDB which can persist as long as the lambda function is "warm"
 d   = get_dynamo_sess()
 
 # determine how old the aws blog post is  
@@ -48,7 +47,6 @@ def get_posts(d, npa, tag):
 
     # if a tag is specified in the get path, scan for it in the tag value
     elif npa == 'tag':
-        print('query '+tag.lower().replace('%20', ' '))
         e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Attr('lower-tag').contains(tag.lower().replace('%20', ' ')))
 
     # else resume the articles for the tag specified
@@ -68,8 +66,8 @@ def get_posts(d, npa, tag):
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
-        if len(x[3]) > 500:
-            desc    = x[3][:500]+' ...'
+        if len(x[3]) > 750:
+            desc    = x[3][:750]+' ...'
         else:
             desc    = x[3]
         
@@ -102,7 +100,7 @@ def generate_urls(d, npa):
         else:
             h += '<a href="https://marek.rocks/'+str(x)+'">'+x+'</a> &#8226; '
             
-    return h[:-8]+'</center><br><br>'
+    return h[:-8]+'</center><br>'
 
 # print http headers for debug headers
 def parse_debug(event):
@@ -111,63 +109,77 @@ def parse_debug(event):
 
 # rewrite the url path if needed. if no path was specified, return all articles
 def check_path(x):
-    y   = x.strip('/')
+    if x.startswith('/http://') or x.startswith('/https://'):
+        return 'redir', x[1:]
+
+    if x.strip('/') in blogs:
+        return x.strip('/'), ''
     
-    if y in blogs:
-        return y, ''
-    
-    elif y[:3] == 'tag':
-        return 'tag', y[4:]
+    elif x.strip('/')[:3] == 'tag':
+        return 'tag', x.strip('/')[4:]
     
     else:
         return 'all', ''
 
 # load the css file
-def load_css():
-    f   = open('main.css', 'r')
+def load_file(x):
+    f   = open(x, 'r')
     x   = f.read()
     f.close()
     return x 
-	
+
 # parse the html file including the image
 def parse_html(d, npa, tag):
-    h =  '<html><head><title>AWS RSS blog feed</title>'
-    h += load_css()+'</head>'
-    h += '<body><center><center><h1>Marek\'s AWS blog feed</h1></center>'
+    h =  '<html><head><title>marek\'s serverless demo</title>'
+    h += load_file('main.css')+'</head>'
+    h += '<body><center><center><h1>serverless AWS blog</h1></center>'
+    h += load_file('search.js')
     h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
-    h += '<center><img src = "https://marek.rocks/1.png" width = 800px></center>'
     h += get_posts(d, npa, tag)
     h += '</td></tr></table></body></html>'
     return h
 
 # return an html document when the lambda function is triggered
 def handler(event, context):
+    
     # get requestor http headers
     seg     = xray_recorder.begin_subsegment('dynamo-session')
     ip      = str(event['headers']['X-Forwarded-For']).split(',')[0]
     co      = str(event['headers']['CloudFront-Viewer-Country'])
     ua      = str(event['headers']['User-Agent'])
     ho      = str(event['headers']['Host'])
-    print('HHH', ho)
+    
+    # print request headers in cloudwatch for debug purposes
+    print('%%%', str(event['headers']))
+    
     xray_recorder.end_subsegment()
 
     # clean the given url path and print debug
     seg     = xray_recorder.begin_subsegment('path-find')
     pa      = event['path']
+    
     seg.put_metadata('key', {ip}, 'IP')
     seg.put_metadata('key', {pa}, 'path')
     seg.put_metadata('key', {co}, 'country')
     
+    # check whether a tag, category, url or no path argument was given
     npa, tag = check_path(pa)
     parse_debug(event)
     xray_recorder.end_subsegment()
 
-    # parse the html output for the client
     seg     = xray_recorder.begin_subsegment('html-parse')
-    h       = parse_html(d, npa, tag)
+    
+    # if a url was submitted, redirect
+    if npa == 'redir':
+        return {'statusCode': '301',
+                'headers': {'Location': tag}} 
+    
+    # else parse the html page
+    else:
+        h       = parse_html(d, npa, tag)
+    
+        return {'statusCode': '200',
+                'body': str(h),
+                'headers': {'Content-Type': 'text/html'}} 
+    
     xray_recorder.end_subsegment()
-
-    # return the html code to api gateway
-    return {'statusCode': 200,
-            'body': str(h),
-            'headers': {'Content-Type': 'text/html'}}
