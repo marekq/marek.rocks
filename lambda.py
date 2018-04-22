@@ -2,6 +2,7 @@
 # marek kuczynski
 # @marekq
 # www.marek.rocks
+# coding: utf-8
 
 import boto3, datetime, os, time
 from aws_xray_sdk.core import xray_recorder
@@ -10,7 +11,8 @@ from boto3.dynamodb.conditions import Key, Attr
 patch_all()
 
 # defines all blog categories from dynamodb which will be included on the page
-blogs = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins']
+blogs       = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins']
+baseurl     = 'https://marek.rocks/'
 
 # open a session with the dynamodb service
 def get_dynamo_sess(): 
@@ -37,9 +39,10 @@ def get_date(x):
         return str(int(int(z)/60))+' minutes'
 
 # get all the blog posts from dynamodb    
-def get_posts(d, npa, tag):
+def get_posts(d, npa, tag, url):
     y   = ''
     h   = []
+    a   = []
 
     # check if a url path was specified and return all articles. if no path was selected, return all articles. return the last 30 days of blogposts only.
     if npa == 'all':
@@ -62,7 +65,11 @@ def get_posts(d, npa, tag):
         else:
             h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], ''])
 
+        a.append(str(x['timest']+','+x['source']))
+
     z   = '<center>'+str(c)+' articles found for '+npa+' <font color = "red">'+tag.replace('%20', ' ')+'</font> - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
+
+    print('???', ','.join(a))
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
@@ -72,33 +79,33 @@ def get_posts(d, npa, tag):
             desc    = x[3]
         
         t           = get_date(x[0])
-        y += '<b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><center><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i></center><br>'+desc+'<br><br><small><font color="#cccccc">tags - '+get_links(x[6], tag.replace('%20', ' '))+'</font></small><br><br><br>'
+        y += '<center><b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i><br><br>'+desc+'<br><br><small><font color="#cccccc">'+get_links(x[6], tag.replace('%20', ' '), url)+'</font></small><br><br>'
 
     return z+y
 
 # generate tag url links
-def get_links(tags, tag):
-    h = ''
+def get_links(tags, tag, url):
+    h = '<center>'
     for x in tags.split(','):
         ct = str(x).strip(' ').replace('%20', ' ')
 
         if tag.lower() == ct.lower():
-            h += '<a href = "https://marek.rocks/tag/'+ct+'"><font color = "red">'+ct+'</font></a> &#8226; '
+            h += '<a href = "'+url+'tag/'+ct+'"><font color = "red">'+ct+'</font></a> &#8226; '
         else:
-            h += '<a href = "https://marek.rocks/tag/'+ct+'">'+ct+'</a> &#8226; '
+            h += '<a href = "'+url+'tag/'+ct+'">'+ct+'</a> &#8226; '
             
-    return h[:-8]
+    return h[:-8]+'</center>'
 
 # generate highlighted url for aws blog links
-def generate_urls(d, npa):
+def generate_urls(d, npa, url):
     h   = '<center>'
     
     for x in blogs:
         if x == npa:
-            h += '<a href="https://marek.rocks/'+x+'"><font color = "red">'+x+'</font></a> &#8226; '
+            h += '<a href="'+url+str(x)+'"><font color = "red">'+x+'</font></a> &#8226; '
     
         else:
-            h += '<a href="https://marek.rocks/'+str(x)+'">'+x+'</a> &#8226; '
+            h += '<a href="'+url+str(x)+'">'+x+'</a> &#8226; '
             
     return h[:-8]+'</center><br>'
 
@@ -128,14 +135,24 @@ def load_file(x):
     f.close()
     return x 
 
+# check user agent
+def check_ua(x):
+    if x == 'Amazon CloudFront':
+        b     = os.environ['baseurl']
+        
+    else:
+        b     = os.environ['apigw']
+
+    return b
+
 # parse the html file including the image
-def parse_html(d, npa, tag):
-    h =  '<html><head><title>marek\'s serverless demo</title>'
+def parse_html(d, npa, tag, url):
+    h =  '<html><head><meta charset="UTF-8"><title>marek\'s serverless demo</title>'
     h += load_file('main.css')+'</head>'
-    h += '<body><center><center><h1>serverless AWS blog</h1></center>'
+    h += '<body><center><h1>Marek\'s Serverless AWS blog</h1>'
     h += load_file('search.js')
-    h += '<table width="800px"><tr><td>'+generate_urls(d, npa)
-    h += get_posts(d, npa, tag)
+    h += '<center><table width="800px"><tr><td>'+generate_urls(d, npa, url)
+    h += get_posts(d, npa, tag, url)
     h += '</td></tr></table></body></html>'
     return h
 
@@ -145,13 +162,10 @@ def handler(event, context):
     # get requestor http headers
     seg     = xray_recorder.begin_subsegment('dynamo-session')
     ip      = str(event['headers']['X-Forwarded-For']).split(',')[0]
-    co      = str(event['headers']['CloudFront-Viewer-Country'])
     ua      = str(event['headers']['User-Agent'])
-    ho      = str(event['headers']['Host'])
-    
+
     # print request headers in cloudwatch for debug purposes
     print('%%%', str(event['headers']))
-    
     xray_recorder.end_subsegment()
 
     # clean the given url path and print debug
@@ -160,8 +174,7 @@ def handler(event, context):
     
     seg.put_metadata('key', {ip}, 'IP')
     seg.put_metadata('key', {pa}, 'path')
-    seg.put_metadata('key', {co}, 'country')
-    
+
     # check whether a tag, category, url or no path argument was given
     npa, tag = check_path(pa)
     parse_debug(event)
@@ -169,17 +182,23 @@ def handler(event, context):
 
     seg     = xray_recorder.begin_subsegment('html-parse')
     
-    # if a url was submitted, redirect
+    # if a url was submitted, redirect to it with a 301
     if npa == 'redir':
+        print('### 301 to '+tag)
+        url     = 'h'
         return {'statusCode': '301',
                 'headers': {'Location': tag}} 
     
     # else parse the html page
     else:
-        h       = parse_html(d, npa, tag)
+        url     = check_ua(ua)
+        h       = parse_html(d, npa, tag, url)
     
+        print('### 200 to '+tag)
+        print('***', str(event['headers']['User-Agent']), str(event['headers']['Host']), pa, url)
+
         return {'statusCode': '200',
                 'body': str(h),
-                'headers': {'Content-Type': 'text/html'}} 
-    
+                'headers': {'Content-Type': 'text/html', 'charset': 'utf-8'}} 
+
     xray_recorder.end_subsegment()
