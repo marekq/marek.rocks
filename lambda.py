@@ -4,23 +4,27 @@
 # www.marek.rocks
 # coding: utf-8
 
-import boto3, datetime, os, time
+# set import path for python libraries to the './libs' folder.
+
+import boto3, datetime, os, time, sys
+from boto3.dynamodb.conditions import Key, Attr
+sys.path.insert(0, './libs')
+
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core import patch_all
-from boto3.dynamodb.conditions import Key, Attr
+
 patch_all()
 
 # defines all blog categories from dynamodb which will be included on the page
-blogs       = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins']
+blogs       = ['all', 'whats-new', 'newsblog', 'devops', 'big-data', 'security', 'java', 'mobile', 'architecture', 'compute', 'database', 'management-tools', 'security-bulletins', 'public-sector', 'gamedev', 'ml', 'cli', 'serverless']
 baseurl     = 'https://marek.rocks/'
 
 # open a session with the dynamodb service
 def get_dynamo_sess(): 
     d   = boto3.resource('dynamodb', region_name = os.environ['dynamo_region']).Table(os.environ['dynamo_post_table'])
     return d
-        
-# create a connection with DynamoDB which can persist as long as the lambda function is "warm"
-d   = get_dynamo_sess()
+
+d       = get_dynamo_sess()
 
 # determine how old the aws blog post is  
 def get_date(x):
@@ -42,11 +46,10 @@ def get_date(x):
 def get_posts(d, npa, tag, url):
     y   = ''
     h   = []
-    a   = []
 
-    # check if a url path was specified and return all articles. if no path was selected, return all articles. return the last 30 days of blogposts only.
+    # check if a url path was specified and return all articles. if no path was selected, return all articles. return the last 90 days of blogposts only.
     if npa == 'all':
-        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', FilterExpression = Key('timest').gt(str(int(time.time()) - int(2592000))))
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES')
 
     # if a tag is specified in the get path, scan for it in the tag value
     elif npa == 'tag':
@@ -54,32 +57,26 @@ def get_posts(d, npa, tag, url):
 
     # else resume the articles for the tag specified
     else:
-        e   = d.query(ReturnConsumedCapacity = 'INDEXES', KeyConditionExpression = Key('source').eq(npa))
-    
-    c   = e['Count']
-    s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
+	    e   = d.query(ReturnConsumedCapacity = 'INDEXES', KeyConditionExpression = Key('source').eq(npa) & Key('timest').gt('1'))
 
     for x in e['Items']:
-        if x.get('tag'):
-            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], x['tag']])
-        else:
-            h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], ''])
+        h.append([x['timest'], x['title'], x['link'], x['desc'], x['source'], x['author'], x['tag']])
 
-        a.append(str(x['timest']+','+x['source']))
-
+    c   = e['Count']
+    s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
     z   = '<center>'+str(c)+' articles found for '+npa+' <font color = "red">'+tag.replace('%20', ' ')+'</font> - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
 
-    print('???', ','.join(a))
+    print('???', tag, str(c), str(s))
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
-        if len(x[3]) > 750:
-            desc    = x[3][:750]+' ...'
+        if len(x[3]) > 500:
+            desc    = x[3][:500]+' ...'
         else:
             desc    = x[3]
         
         t           = get_date(x[0])
-        y += '<center><b><a href='+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i><br><br>'+desc+'<br><br><small><font color="#cccccc">'+get_links(x[6], tag.replace('%20', ' '), url)+'</font></small><br><br>'
+        y += '<center><b><a href='+baseurl+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i><br><br>'+desc+'<br><br><small><font color="#cccccc">'+get_links(x[6], tag.replace('%20', ' '), url)+'</font></small><br><br>'
 
     return z+y
 
@@ -139,7 +136,6 @@ def load_file(x):
 def check_ua(x):
     if x == 'Amazon CloudFront':
         b     = os.environ['baseurl']
-        
     else:
         b     = os.environ['apigw']
 
@@ -169,23 +165,25 @@ def handler(event, context):
     xray_recorder.end_subsegment()
 
     # clean the given url path and print debug
-    seg     = xray_recorder.begin_subsegment('path-find')
+    xray_recorder.begin_subsegment('path-find')
     pa      = event['path']
     
-    seg.put_metadata('key', {ip}, 'IP')
-    seg.put_metadata('key', {pa}, 'path')
+    xray_recorder.current_subsegment().put_annotation('clientip', ip)
+    xray_recorder.current_subsegment().put_annotation('useragent', ua)
+    xray_recorder.current_subsegment().put_annotation('urlpath', pa)
 
     # check whether a tag, category, url or no path argument was given
     npa, tag = check_path(pa)
     parse_debug(event)
     xray_recorder.end_subsegment()
 
-    seg     = xray_recorder.begin_subsegment('html-parse')
+    xray_recorder.begin_subsegment('html-parse')
     
     # if a url was submitted, redirect to it with a 301
     if npa == 'redir':
-        print('### 301 to '+tag)
-        url     = 'h'
+        print('301***', str(event['headers']['User-Agent']), str(event['headers']['Host']), pa, '', tag)
+        xray_recorder.current_subsegment().put_annotation('statuscode', '301')
+
         return {'statusCode': '301',
                 'headers': {'Location': tag}} 
     
@@ -194,8 +192,8 @@ def handler(event, context):
         url     = check_ua(ua)
         h       = parse_html(d, npa, tag, url)
     
-        print('### 200 to '+tag)
-        print('***', str(event['headers']['User-Agent']), str(event['headers']['Host']), pa, url)
+        print('200 ***', str(event['headers']['User-Agent']), str(event['headers']['Host']), pa, url, tag)
+        xray_recorder.current_subsegment().put_annotation('statuscode', '200')
 
         return {'statusCode': '200',
                 'body': str(h),
