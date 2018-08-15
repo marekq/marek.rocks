@@ -49,7 +49,7 @@ def get_posts(d, npa, tag, url):
 
     # check if a url path was specified and return all articles. if no path was selected, return all articles. return the last 90 days of blogposts only.
     if npa == 'all':
-        e   = d.scan(ReturnConsumedCapacity = 'INDEXES')
+        e   = d.scan(ReturnConsumedCapacity = 'INDEXES', Limit = 750, ConsistentRead = True)
 
     # if a tag is specified in the get path, scan for it in the tag value
     elif npa == 'tag':
@@ -64,19 +64,19 @@ def get_posts(d, npa, tag, url):
 
     c   = e['Count']
     s   = e['ResponseMetadata']['HTTPHeaders']['content-length']
-    z   = '<center>'+str(c)+' articles found for '+npa+' <font color = "red">'+tag.replace('%20', ' ')+'</font> - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)<br><br>'
+    z   = '<center>'+str(c)+' articles found for '+npa+' <font color = "red">'+tag.replace('%20', ' ')+'</font> - '+s+' bytes (<a href="https://github.com/marekq/marek.rocks">source</a>)</center><br><br>'
 
     print('???', tag, str(c), str(s))
 
     # print all the articles in html, shorten description text if needed
     for x in sorted(h, reverse = True):
-        if len(x[3]) > 500:
-            desc    = x[3][:500]+' ...'
+        if len(x[3]) > 1000:
+            desc    = x[3][:1000]+' ...'
         else:
             desc    = x[3]
         
         t           = get_date(x[0])
-        y += '<center><b><a href='+baseurl+x[2]+' target="_blank">'+x[1]+'</a></b><br><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i><br><br>'+desc+'<br><br><small><font color="#cccccc">'+get_links(x[6], tag.replace('%20', ' '), url)+'</font></small><br><br>'
+        y += '<center><b><a href='+baseurl+x[2].strip()+' target="_blank">'+x[1][:100]+'</a></b><br><i>posted '+t+' ago by '+x[5]+' in '+x[4]+' blog</i><br><br>'+desc+'<br><br><small><font color="#cccccc">'+get_links(x[6], tag.replace('%20', ' '), url)+'</font></small><br><br></center>\n'
 
     return z+y
 
@@ -91,7 +91,7 @@ def get_links(tags, tag, url):
         else:
             h += '<a href = "'+url+'tag/'+ct+'">'+ct+'</a> &#8226; '
             
-    return h[:-8]+'</center>'
+    return h[:-9]+'</center>'
 
 # generate highlighted url for aws blog links
 def generate_urls(d, npa, url):
@@ -145,9 +145,9 @@ def check_ua(x):
 def parse_html(d, npa, tag, url):
     h =  '<html><head><meta charset="UTF-8"><title>marek\'s serverless demo</title>'
     h += load_file('main.css')+'</head>'
-    h += '<body><center><h1>Marek\'s Serverless AWS blog</h1>'
-    h += load_file('search.js')
-    h += '<center><table width="800px"><tr><td>'+generate_urls(d, npa, url)
+    h += '<body><center><h1>Marek\'s Serverless AWS blog</h1></center>'
+    #h += load_file('search.js')
+    h += '<center><table width="800px"><col width="800px"><tr><td>'+generate_urls(d, npa, url)+'</center>'
     h += get_posts(d, npa, tag, url)
     h += '</td></tr></table></body></html>'
     return h
