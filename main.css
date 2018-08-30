@@ -1,19 +1,16 @@
+
 <style type="text/css">
     a:link {
-        color: black;
+        color: gray;
     }
     
     a:visited {
-        color: black;
+        color: gray;
     }
 
     u.dotted{
-  	border-bottom: 1px dashed #999;
-  	text-decoration: none; 
-    }
-
-    img {
-        max-width: 800px;
+      	border-bottom: 1px dashed #999;
+      	text-decoration: none; 
     }
     
     body {
@@ -23,7 +20,7 @@
         margin-bottom: 50px;
         padding: 0;
         font-family: Courier New, Fixed;
-        font-size: 15px;
+        font-size: 14px;
         color: #555;
     }
 </style>
