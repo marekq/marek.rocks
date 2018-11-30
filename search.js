@@ -1,5 +1,7 @@
-<center><input type="text" id="page" />
-<input type="submit" id="box" value="search topic" onkeypress="goToPage();" onclick="goToPage();" /></center><br>
+<center>
+<input type="text" id="page" value="">
+<input type="submit" id="box" onkeypress="goToPage();" onclick="goToPage();">
+</center><br>
 
 <script type="text/javascript">
     function goToPage() {
@@ -13,7 +15,7 @@ var input = document.getElementById("page");
 input.addEventListener("keyup", function(event) {
     event.preventDefault();
     if (event.keyCode === 13) {
-        document.getElementById("myBtn").click();
+        document.getElementById("box").click();
     }
 });
 </script>
