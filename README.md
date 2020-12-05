@@ -1,7 +1,10 @@
 marek.rocks
 ===========
 
-The sourcecode of my website hosted at https://marek.rocks , which I use for demo's on how high performance, serverless webpages can be built using AWS Lambda.  
+## Decomissioned - I switched to AWS Amplify for my website and no longer maintain this code. You can find the source code for my Amplify website here; https://github.com/marekq/amplify-blog ##
+
+
+The sourcecode of my previous website hosted at https://marek.rocks , which I used for demo's on how high performance, serverless webpages can be built using AWS Lambda.  
 
 The webpage is using an API gateway which forwards to Python Lambda code. The Lambda code automatically retrieves all of the AWS blog posts which are kept in a DynamoDB database. You can include a Lambda layer with the aws-xray-sdk in order to support tracing of the function. 
  
